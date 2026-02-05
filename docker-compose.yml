@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - API_KEY=${API_KEY}
     container_name: lookcerto_production
     ports:
       - "3030:80"
