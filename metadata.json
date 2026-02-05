@@ -1,6 +1,6 @@
 {
   "name": "lookcerto.com",
-  "description": "Professional SaaS platform for AI-powered virtual try-ons and product mockups. Transform clothing and accessories into realistic marketing images.",
+  "description": "Plataforma SaaS profissional para provadores digitais e mockups de alta precisão. Transforme vestuário e acessórios em imagens comerciais realistas através do nosso motor de renderização avançado.",
   "requestFramePermissions": [
     "camera"
   ]

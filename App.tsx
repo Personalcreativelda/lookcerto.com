@@ -10,8 +10,6 @@ import Login from './views/Login';
 import Signup from './views/Signup';
 import Navbar from './components/Navbar';
 
-// Fix: Move PrivateRoute outside the component to prevent recreation on every render
-// and to fix the TypeScript error where children were not correctly inferred when defined inline.
 interface PrivateRouteProps {
   children: React.ReactNode;
   isAuthenticated: boolean;
@@ -22,6 +20,11 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, isAuthenticated }
 };
 
 const App: React.FC = () => {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('lookcerto_theme') === 'dark' || 
+           (!localStorage.getItem('lookcerto_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem('lookcerto_state');
@@ -38,6 +41,16 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('lookcerto_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('lookcerto_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
     localStorage.setItem('lookcerto_state', JSON.stringify(state));
   }, [state]);
 
@@ -48,6 +61,8 @@ const App: React.FC = () => {
   const logout = () => {
     setState(prev => ({ ...prev, user: null, isAuthenticated: false }));
   };
+
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const addHistoryItem = (item: MockupResult) => {
     if (!state.user) return;
@@ -75,8 +90,15 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <div className="min-h-screen flex flex-col bg-slate-50">
-        {state.isAuthenticated && <Navbar user={state.user!} onLogout={logout} />}
+      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        {state.isAuthenticated && (
+          <Navbar 
+            user={state.user!} 
+            onLogout={logout} 
+            isDarkMode={isDarkMode} 
+            toggleDarkMode={toggleDarkMode} 
+          />
+        )}
         <main className={`flex-grow ${state.isAuthenticated ? 'container mx-auto px-4 py-8 max-w-7xl' : ''}`}>
           <Routes>
             <Route path="/login" element={!state.isAuthenticated ? <Login onLogin={login} /> : <Navigate to="/" />} />
@@ -90,8 +112,8 @@ const App: React.FC = () => {
             <Route path="*" element={<Navigate to={state.isAuthenticated ? "/" : "/login"} />} />
           </Routes>
         </main>
-        <footer className="bg-white border-t border-slate-200 py-8 text-center text-slate-500 text-sm">
-          <p>© 2024 lookcerto.com - Tecnologia de Provador Virtual IA para Moçambique e o Mundo.</p>
+        <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 text-center text-slate-500 dark:text-slate-400 text-sm transition-colors">
+          <p>© 2024 lookcerto.com - Experimentador de Roupas Virtuais em Moçambique e o Mundo.</p>
         </footer>
       </div>
     </HashRouter>
