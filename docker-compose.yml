@@ -10,8 +10,6 @@ services:
     container_name: lookcerto_production
     ports:
       - "3030:80"
-    env_file:
-      - .env
     environment:
       - NODE_ENV=production
     restart: always
