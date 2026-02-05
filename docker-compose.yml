@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  lookcerto-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lookcerto_production
+    ports:
+      - "3030:80"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: always
+    networks:
+      - lookcerto-network
+
+networks:
+  lookcerto-network:
+    driver: bridge
