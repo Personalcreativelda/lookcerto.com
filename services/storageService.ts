@@ -1,59 +1,87 @@
-
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 /**
- * Serviço para gerir o upload de imagens para S3 ou MinIO.
- * As credenciais são lidas das variáveis de ambiente.
+ * Serviço para gerir o upload de imagens para o MinIO.
  */
 export class StorageService {
   private client: S3Client | null = null;
 
   private getClient() {
     if (!this.client) {
-      // Nota: Em produção, o ideal é usar pre-signed URLs via backend para segurança.
-      // Esta implementação assume que as chaves estão disponíveis no ambiente para o MVP.
-      this.client = new S3Client({
-        endpoint: process.env.S3_ENDPOINT,
-        region: process.env.S3_REGION || "us-east-1",
-        credentials: {
-          accessKeyId: process.env.S3_ACCESS_KEY || "",
-          secretAccessKey: process.env.S3_SECRET_KEY || "",
-        },
-        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
-      });
+      const endpoint = process.env.MINIO_ENDPOINT;
+      
+      // Validação crítica para evitar o erro "Invalid URL"
+      if (!endpoint || endpoint === "" || endpoint === "undefined") {
+        console.error("ERRO CRÍTICO: MINIO_ENDPOINT não está definido no ambiente!");
+        return null;
+      }
+
+      const formattedEndpoint = endpoint.startsWith('http') ? endpoint : `https://${endpoint}`;
+      
+      try {
+        // Testa se a URL é válida antes de passar para o SDK
+        new URL(formattedEndpoint);
+        
+        this.client = new S3Client({
+          endpoint: formattedEndpoint,
+          region: process.env.MINIO_REGION || "us-east-1",
+          credentials: {
+            accessKeyId: process.env.MINIO_ACCESS_KEY || "",
+            secretAccessKey: process.env.MINIO_SECRET_KEY || "",
+          },
+          forcePathStyle: true,
+        });
+      } catch (e) {
+        console.error("ERRO: URL do MinIO inválida:", formattedEndpoint);
+        return null;
+      }
     }
     return this.client;
   }
 
   /**
-   * Converte base64 para buffer/blob e envia para o bucket.
-   * @returns URL pública da imagem
+   * Converte base64 para Blob e envia para o bucket.
    */
   async uploadBase64Image(base64Data: string, fileName: string): Promise<string> {
     const client = this.getClient();
-    const bucket = process.env.S3_BUCKET_NAME;
+    if (!client) {
+      console.warn("Storage não configurado. Retornando base64.");
+      return base64Data;
+    }
 
-    // Remover prefixo data:image/...;base64,
-    const base64Content = base64Data.split(",")[1];
-    const buffer = Uint8Array.from(atob(base64Content), (c) => c.charCodeAt(0));
-
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: `mockups/${fileName}.jpg`,
-      Body: buffer,
-      ContentType: "image/jpeg",
-      // ACL: 'public-read' // Depende da configuração do seu bucket MinIO
-    });
+    const bucket = process.env.MINIO_BUCKET || "typebot";
 
     try {
+      // Conversão manual de base64 para Blob (mais segura para imagens grandes)
+      const parts = base64Data.split(';base64,');
+      const contentType = parts[0].split(':')[1];
+      const raw = window.atob(parts[1]);
+      const rawLength = raw.length;
+      const uInt8Array = new Uint8Array(rawLength);
+
+      for (let i = 0; i < rawLength; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+      }
+
+      const blob = new Blob([uInt8Array], { type: contentType });
+
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: `mockups/${fileName}.jpg`,
+        Body: blob,
+        ContentType: "image/jpeg",
+      });
+
       await client.send(command);
       
-      // Constrói a URL de retorno baseada no endpoint e bucket
-      const baseUrl = process.env.S3_ENDPOINT?.replace(/\/$/, "");
-      return `${baseUrl}/${bucket}/mockups/${fileName}.jpg`;
-    } catch (error) {
-      console.error("Erro no upload para S3/MinIO:", error);
-      // Fallback para a própria string base64 se o upload falhar, para não travar o app
+      const publicBaseUrl = process.env.MINIO_PUBLIC_URL || process.env.MINIO_ENDPOINT;
+      const cleanBaseUrl = publicBaseUrl?.startsWith('http') ? publicBaseUrl : `https://${publicBaseUrl}`;
+      const finalUrl = `${cleanBaseUrl.replace(/\/$/, "")}/${bucket}/mockups/${fileName}.jpg`;
+      
+      console.log("Upload MinIO Sucesso:", finalUrl);
+      return finalUrl;
+    } catch (error: any) {
+      console.error("Erro no upload para MinIO:", error.message || error);
       return base64Data;
     }
   }

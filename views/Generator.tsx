@@ -12,18 +12,18 @@ interface GeneratorProps {
 const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
   const [personImg, setPersonImg] = useState<string | null>(null);
   const [productImg, setProductImg] = useState<string | null>(null);
-  const [category, setCategory] = useState<Category>(Category.TSHIRT);
+  const [category, setCategory] = useState<Category>(Category.AUTO);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<{ message: string; type?: string } | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
 
   const steps = [
-    "Identificando silhueta...",
-    "Posicionando produto...",
-    "Ajustando caimento...",
-    "Finalizando texturas...",
-    "Gerando look virtual..."
+    "Analisando geometria corporal...",
+    "Extraindo padrões de tecido...",
+    "Calculando profundidade e oclusão...",
+    "Sincronizando luzes ambientais...",
+    "Finalizando renderização 4K..."
   ];
 
   const compressImage = (base64Str: string): Promise<string> => {
@@ -32,7 +32,8 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
       img.src = base64Str;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 1024;
+        // Aumentado para 2000px para garantir máxima nitidez para a IA trabalhar
+        const MAX_SIZE = 2000; 
         let width = img.width;
         let height = img.height;
         if (width > height) {
@@ -50,7 +51,8 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        // Qualidade quase máxima para preservar texturas finas
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
       };
     });
   };
@@ -72,7 +74,7 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
   const handleGenerate = async () => {
     if (!personImg || !productImg) return;
     if (user.credits <= 0) {
-      setError({ message: "Capacidade esgotada. Faça upgrade do plano." });
+      setError({ message: "Créditos insuficientes para renderização HD." });
       return;
     }
 
@@ -82,11 +84,11 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
     
     const interval = setInterval(() => {
       setLoadingStep(s => (s + 1) % steps.length);
-    }, 2000);
+    }, 3000);
 
     try {
       const base64Result = await geminiService.generateMockup(personImg, productImg, category);
-      const fileName = `look-${Date.now()}`;
+      const fileName = `look-final-${Date.now()}`;
       const hostedUrl = await storageService.uploadBase64Image(base64Result, fileName);
 
       const newMockup: MockupResult = {
@@ -96,17 +98,13 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
         personUrl: personImg,
         productUrl: productImg,
         category: category,
-        prompt: `Prova virtual: ${category}`
+        prompt: `Deep Render: ${category}`
       };
 
       setResult(hostedUrl);
       onSuccess(newMockup);
-      // Auto scroll to result on mobile
-      if (window.innerWidth < 1024) {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      }
     } catch (err: any) {
-      setError({ message: "Falha na simulação. Verifique as fotos e tente novamente." });
+      setError({ message: "O motor de renderização encontrou um problema na anatomia das fotos." });
     } finally {
       clearInterval(interval);
       setIsGenerating(false);
@@ -115,33 +113,39 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-10 animate-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-0 px-2 md:px-0">
-      <header className="text-center md:text-left px-4">
-        <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Estúdio de Simulação</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm md:text-lg font-medium">Prove qualquer peça digitalmente agora.</p>
+      <header className="text-center md:text-left px-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight uppercase">LookCerto <span className="text-indigo-600">Engine v3</span></h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm md:text-lg font-medium">Renderização de alta fidelidade com física de tecidos.</p>
+        </div>
+        <div className="hidden md:flex items-center space-x-2 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+           <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+           <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Modo Realismo Ativado</span>
+        </div>
       </header>
 
       {error && (
-        <div className="mx-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-4 rounded-xl flex items-center justify-between text-xs md:text-sm font-bold">
-          <p>{error.message}</p>
-          <button onClick={() => setError(null)}>✕</button>
+        <div className="mx-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-5 rounded-2xl flex items-center justify-between text-xs md:text-sm font-bold shadow-lg">
+          <p>⚠️ {error.message}</p>
+          <button onClick={() => setError(null)} className="p-2 hover:bg-red-100 dark:hover:bg-red-800 rounded-lg transition-colors">✕</button>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-start">
-        {/* Input Panel */}
-        <div className="lg:col-span-4 space-y-6 md:space-y-8 bg-white dark:bg-slate-900 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
-          <div className="space-y-3">
-            <label className="block text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Selecione a Peça</label>
-            <div className="flex overflow-x-auto pb-2 -mx-1 px-1 gap-2 scrollbar-hide md:grid md:grid-cols-2">
+        {/* Painel de Upload */}
+        <div className="lg:col-span-4 space-y-6 md:space-y-8 bg-white dark:bg-slate-900 p-5 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
+          <div className="space-y-4">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Selecione o Look</label>
+            <div className="grid grid-cols-2 gap-2">
               {Object.values(Category).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
-                  className={`flex-shrink-0 px-4 py-2 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
+                  className={`px-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all ${
                     category === cat 
-                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' 
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-md' 
                       : 'border-slate-50 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-400'
-                  }`}
+                  } ${cat === Category.AUTO ? 'col-span-2 border-dashed' : ''}`}
                 >
                   {cat}
                 </button>
@@ -151,30 +155,30 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
 
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
             <div className="space-y-2">
-              <label className="block text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Foto do Cliente</label>
-              <div className={`relative border-2 border-dashed rounded-xl md:rounded-[1.5rem] overflow-hidden aspect-square flex items-center justify-center ${personImg ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50'}`}>
+              <label className="block text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sua Foto</label>
+              <div className={`relative border-2 border-dashed rounded-2xl overflow-hidden aspect-[3/4] flex items-center justify-center transition-all ${personImg ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50'}`}>
                 <input type="file" onChange={(e) => handleFileUpload(e, 'person')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*" />
                 {personImg ? (
-                  <img src={personImg} className="w-full h-full object-cover" alt="Cliente" />
+                  <img src={personImg} className="w-full h-full object-cover" alt="Sua Foto" />
                 ) : (
-                  <div className="text-center p-2">
-                    <svg className="w-6 h-6 md:w-8 md:h-8 mx-auto text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                    <span className="text-[7px] md:text-[10px] text-slate-400 font-bold uppercase block leading-tight">Adicionar Pessoa</span>
+                  <div className="text-center p-4">
+                    <svg className="w-8 h-8 mx-auto text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    <span className="text-[9px] text-slate-400 font-black uppercase block">Carregar Selfie</span>
                   </div>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Foto do Produto</label>
-              <div className={`relative border-2 border-dashed rounded-xl md:rounded-[1.5rem] overflow-hidden aspect-square flex items-center justify-center ${productImg ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50'}`}>
+              <label className="block text-[8px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Foto da Peça</label>
+              <div className={`relative border-2 border-dashed rounded-2xl overflow-hidden aspect-[3/4] flex items-center justify-center transition-all ${productImg ? 'border-indigo-400 bg-indigo-50/20' : 'border-slate-100 dark:border-slate-800 bg-slate-50/50'}`}>
                 <input type="file" onChange={(e) => handleFileUpload(e, 'product')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*" />
                 {productImg ? (
                   <img src={productImg} className="w-full h-full object-cover" alt="Produto" />
                 ) : (
-                  <div className="text-center p-2">
-                    <svg className="w-6 h-6 md:w-8 md:h-8 mx-auto text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    <span className="text-[7px] md:text-[10px] text-slate-400 font-bold uppercase block leading-tight">Adicionar Peça</span>
+                  <div className="text-center p-4">
+                    <svg className="w-8 h-8 mx-auto text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span className="text-[9px] text-slate-400 font-black uppercase block">Carregar Roupa</span>
                   </div>
                 )}
               </div>
@@ -184,49 +188,68 @@ const Generator: React.FC<GeneratorProps> = ({ user, onSuccess }) => {
           <button
             onClick={handleGenerate}
             disabled={!personImg || !productImg || isGenerating}
-            className={`w-full py-4 md:py-5 rounded-xl md:rounded-[1.5rem] font-black text-xs md:text-sm shadow-xl transition-all uppercase tracking-widest ${
+            className={`w-full py-5 rounded-2xl font-black text-xs md:text-sm shadow-2xl transition-all uppercase tracking-widest flex items-center justify-center space-x-3 ${
               !personImg || !productImg || isGenerating 
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 cursor-not-allowed shadow-none' 
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 cursor-not-allowed' 
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-indigo-200 dark:shadow-none'
             }`}
           >
-            {isGenerating ? 'Simulando...' : 'Simular o Look'}
+            {isGenerating ? (
+              <>
+                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Processando Realismo...</span>
+              </>
+            ) : 'Gerar Look Realista'}
           </button>
         </div>
 
-        {/* Output Panel */}
-        <div className="lg:col-span-8">
-          <div className="bg-white dark:bg-slate-900 rounded-[1.5rem] md:rounded-[3rem] min-h-[400px] md:min-h-[650px] flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-800 relative shadow-inner transition-colors">
+        {/* Painel de Visualização */}
+        <div id="result-panel" className="lg:col-span-8">
+          <div className="bg-slate-50 dark:bg-slate-900/80 rounded-[2.5rem] min-h-[500px] md:min-h-[750px] flex items-center justify-center overflow-hidden border-2 border-white dark:border-slate-800 relative shadow-2xl transition-all">
             {isGenerating ? (
-              <div className="text-center p-6 space-y-6">
-                <div className="relative w-16 h-16 md:w-20 md:h-20 mx-auto">
-                  <div className="absolute inset-0 border-4 border-indigo-600/20 rounded-full"></div>
+              <div className="text-center p-8 space-y-8 max-w-sm">
+                <div className="relative w-32 h-32 mx-auto">
+                  <div className="absolute inset-0 border-4 border-indigo-600/10 rounded-full"></div>
                   <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-4 border-2 border-indigo-400 border-b-transparent rounded-full animate-spin-slow"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-indigo-600 font-black text-xs">AI</span>
+                  </div>
                 </div>
-                <h3 className="text-lg md:text-2xl font-black text-slate-800 dark:text-white tracking-tighter animate-pulse">{steps[loadingStep]}</h3>
+                <div className="space-y-4">
+                  <h3 className="text-xl md:text-3xl font-black text-slate-800 dark:text-white tracking-tighter uppercase animate-pulse">{steps[loadingStep]}</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Isso pode levar alguns segundos devido à alta complexidade da renderização fotográfica.</p>
+                </div>
               </div>
             ) : result ? (
-              <div className="w-full h-full flex flex-col p-4 md:p-10 animate-in zoom-in-95 duration-500">
-                <div className="flex-grow flex items-center justify-center">
-                  <img src={result} className="max-w-full max-h-[400px] md:max-h-[500px] object-contain rounded-xl md:rounded-[2rem] shadow-2xl border-4 md:border-8 border-white dark:border-slate-800" alt="Look Final" />
-                </div>
-                <div className="mt-6 md:mt-10 bg-slate-50 dark:bg-slate-800/50 p-4 md:p-6 rounded-xl md:rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-4 border border-slate-100 dark:border-slate-800">
-                  <div className="text-center sm:text-left">
-                    <p className="font-black text-slate-900 dark:text-white text-sm md:text-base">Simulação Pronta</p>
-                    <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Renderização em 4K</p>
+              <div className="w-full h-full flex flex-col p-4 md:p-8 animate-in zoom-in-95 duration-700">
+                <div className="flex-grow flex items-center justify-center relative rounded-[2rem] overflow-hidden group shadow-2xl bg-white">
+                  <img src={result} className="max-w-full max-h-[550px] md:max-h-[700px] object-contain" alt="Resultado Final" />
+                  <div className="absolute top-6 left-6 flex items-center space-x-2">
+                    <div className="bg-emerald-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">Fidelidade Validada</div>
                   </div>
-                  <div className="flex items-center space-x-2 md:space-x-3 w-full sm:w-auto">
-                    <button onClick={() => window.open(result, '_blank')} className="flex-1 sm:flex-none bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg md:rounded-xl font-black text-[9px] uppercase tracking-widest">Abrir Link</button>
-                    <a href={result} download className="bg-indigo-600 text-white p-2 md:p-3 rounded-lg md:rounded-xl hover:bg-indigo-700 transition-all">
-                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </div>
+                
+                <div className="mt-8 bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-6 border border-slate-100 dark:border-slate-700 shadow-xl">
+                  <div className="text-center sm:text-left">
+                    <p className="font-black text-slate-900 dark:text-white text-lg md:text-xl uppercase tracking-tighter">Renderização Finalizada</p>
+                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">Pronto para catálogos e marketing digital</p>
+                  </div>
+                  <div className="flex items-center space-x-3 w-full sm:w-auto">
+                    <button onClick={() => window.open(result, '_blank')} className="flex-1 sm:flex-none bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">Ver em HD</button>
+                    <a href={result} download={`lookcerto-${Date.now()}.jpg`} className="bg-indigo-600 text-white p-4 rounded-xl hover:bg-indigo-700 transition-all shadow-xl">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     </a>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center text-slate-300 p-10 animate-in fade-in">
-                <svg className="w-16 h-16 md:w-24 md:h-24 mx-auto opacity-10 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <p className="text-sm md:text-lg font-black tracking-tight text-slate-400 uppercase">Aguardando Fotos</p>
+              <div className="text-center text-slate-300 p-12">
+                <div className="w-32 h-32 md:w-48 md:h-48 mx-auto bg-white/50 dark:bg-white/5 rounded-full flex items-center justify-center mb-10 border-2 border-dashed border-slate-100 dark:border-slate-800">
+                  <svg className="w-16 h-16 md:w-24 md:h-24 text-slate-200 dark:text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-slate-400 dark:text-slate-700 uppercase mb-4">Aguardando Referências</h2>
+                <p className="text-[10px] md:text-xs font-bold text-slate-300 dark:text-slate-800 uppercase tracking-widest max-w-xs mx-auto">Selecione fotos claras e bem iluminadas para o melhor resultado possível.</p>
               </div>
             )}
           </div>

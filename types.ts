@@ -32,9 +32,11 @@ export interface AppState {
 }
 
 export enum Category {
-  TSHIRT = 'Camiseta',
-  HOODIE = 'Moletom',
-  DRESS = 'Vestido',
-  EYEWEAR = 'Óculos',
-  CAP = 'Boné'
+  AUTO = 'Auto-Detectar',
+  TSHIRT = 'Parte Superior',
+  PANTS = 'Parte Inferior',
+  DRESS = 'Vestido/Conjunto',
+  SHOES = 'Calçados',
+  EYEWEAR = 'Acessórios',
+  CAP = 'Boné/Chapéu'
 }

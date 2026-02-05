@@ -1,16 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// No Coolify/Docker, as variáveis estão no process.env
 export default defineConfig({
   plugins: [react()],
   define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
-    'process.env.S3_ENDPOINT': JSON.stringify(process.env.S3_ENDPOINT),
-    'process.env.S3_REGION': JSON.stringify(process.env.S3_REGION),
-    'process.env.S3_ACCESS_KEY': JSON.stringify(process.env.S3_ACCESS_KEY),
-    'process.env.S3_SECRET_KEY': JSON.stringify(process.env.S3_SECRET_KEY),
-    'process.env.S3_BUCKET_NAME': JSON.stringify(process.env.S3_BUCKET_NAME),
-    'process.env.S3_FORCE_PATH_STYLE': JSON.stringify(process.env.S3_FORCE_PATH_STYLE),
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || ''),
+    'process.env.MINIO_ENDPOINT': JSON.stringify(process.env.MINIO_ENDPOINT || ''),
+    'process.env.MINIO_REGION': JSON.stringify(process.env.MINIO_REGION || 'us-east-1'),
+    'process.env.MINIO_ACCESS_KEY': JSON.stringify(process.env.MINIO_ACCESS_KEY || ''),
+    'process.env.MINIO_SECRET_KEY': JSON.stringify(process.env.MINIO_SECRET_KEY || ''),
+    'process.env.MINIO_BUCKET': JSON.stringify(process.env.MINIO_BUCKET || 'typebot'),
+    'process.env.MINIO_PUBLIC_URL': JSON.stringify(process.env.MINIO_PUBLIC_URL || ''),
   },
   build: {
     outDir: 'dist',
