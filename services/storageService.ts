@@ -1,59 +1,52 @@
+
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 /**
- * Serviço para gerir o upload de imagens para o MinIO.
+ * Serviço para gerir o upload de imagens. 
+ * Agora resiliente: se não houver config, funciona em modo Base64 sem erros.
  */
 export class StorageService {
   private client: S3Client | null = null;
 
   private getClient() {
-    if (!this.client) {
+    try {
+      if (this.client) return this.client;
+
       const endpoint = process.env.MINIO_ENDPOINT;
-      
-      // Validação crítica para evitar o erro "Invalid URL"
-      if (!endpoint || endpoint === "" || endpoint === "undefined") {
-        console.error("ERRO CRÍTICO: MINIO_ENDPOINT não está definido no ambiente!");
-        return null;
+      if (!endpoint || endpoint === "" || endpoint === "undefined" || endpoint.includes("seu-servidor")) {
+        return null; // Modo silencioso: sem storage configurado
       }
 
       const formattedEndpoint = endpoint.startsWith('http') ? endpoint : `https://${endpoint}`;
       
-      try {
-        // Testa se a URL é válida antes de passar para o SDK
-        new URL(formattedEndpoint);
-        
-        this.client = new S3Client({
-          endpoint: formattedEndpoint,
-          region: process.env.MINIO_REGION || "us-east-1",
-          credentials: {
-            accessKeyId: process.env.MINIO_ACCESS_KEY || "",
-            secretAccessKey: process.env.MINIO_SECRET_KEY || "",
-          },
-          forcePathStyle: true,
-        });
-      } catch (e) {
-        console.error("ERRO: URL do MinIO inválida:", formattedEndpoint);
-        return null;
-      }
+      this.client = new S3Client({
+        endpoint: formattedEndpoint,
+        region: process.env.MINIO_REGION || "us-east-1",
+        credentials: {
+          accessKeyId: process.env.MINIO_ACCESS_KEY || "",
+          secretAccessKey: process.env.MINIO_SECRET_KEY || "",
+        },
+        forcePathStyle: true,
+      });
+      return this.client;
+    } catch (e) {
+      return null;
     }
-    return this.client;
   }
 
   /**
-   * Converte base64 para Blob e envia para o bucket.
+   * Tenta enviar para o S3/MinIO, caso contrário retorna a string base64 original.
    */
   async uploadBase64Image(base64Data: string, fileName: string): Promise<string> {
     const client = this.getClient();
-    if (!client) {
-      console.warn("Storage não configurado. Retornando base64.");
-      return base64Data;
-    }
+    if (!client) return base64Data;
 
-    const bucket = process.env.MINIO_BUCKET || "typebot";
+    const bucket = process.env.MINIO_BUCKET || "lookcerto";
 
     try {
-      // Conversão manual de base64 para Blob (mais segura para imagens grandes)
       const parts = base64Data.split(';base64,');
+      if (parts.length < 2) return base64Data;
+      
       const contentType = parts[0].split(':')[1];
       const raw = window.atob(parts[1]);
       const rawLength = raw.length;
@@ -76,12 +69,9 @@ export class StorageService {
       
       const publicBaseUrl = process.env.MINIO_PUBLIC_URL || process.env.MINIO_ENDPOINT;
       const cleanBaseUrl = publicBaseUrl?.startsWith('http') ? publicBaseUrl : `https://${publicBaseUrl}`;
-      const finalUrl = `${cleanBaseUrl.replace(/\/$/, "")}/${bucket}/mockups/${fileName}.jpg`;
-      
-      console.log("Upload MinIO Sucesso:", finalUrl);
-      return finalUrl;
-    } catch (error: any) {
-      console.error("Erro no upload para MinIO:", error.message || error);
+      return `${cleanBaseUrl.replace(/\/$/, "")}/${bucket}/mockups/${fileName}.jpg`;
+    } catch (error) {
+      console.warn("Storage Offline: Usando fallback Base64");
       return base64Data;
     }
   }
