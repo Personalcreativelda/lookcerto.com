@@ -27,7 +27,7 @@ const App: React.FC = () => {
 
   const [state, setState] = useState<AppState>(() => {
     try {
-      const saved = localStorage.getItem('lookcerto_state');
+      const saved = localStorage.getItem('lookcerto_state_v2');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error("Falha ao carregar estado:", e);
@@ -50,24 +50,26 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  // Efeito para persistência segura
+  // Persistência segura: Apenas truncamos o que vai para o DISCO, não o que está em MEMÓRIA
   useEffect(() => {
     try {
-      // Antes de salvar, removemos imagens em Base64 do histórico se forem muito grandes
-      // para evitar estourar o limite de 5MB do localStorage
+      if (!state.isAuthenticated) return;
+
       const stateToSave = {
         ...state,
         history: state.history.map(item => ({
           ...item,
-          // Se a imagem for base64 e não uma URL real, mantemos apenas se for a última
-          // ou removemos se o estado ficar muito grande. Aqui apenas salvamos.
-          imageUrl: item.imageUrl.length > 1000000 ? item.imageUrl.substring(0, 100) + "...truncated" : item.imageUrl
-        })).slice(0, 5) // Guardamos apenas os 5 últimos para segurança
+          // Se for base64 e for muito grande, salvamos apenas uma versão reduzida no disco
+          imageUrl: (item.imageUrl.startsWith('data:') && item.imageUrl.length > 500000)
+            ? "data:image/png;base64,TRUNCATED_FOR_STORAGE" 
+            : item.imageUrl,
+          personUrl: "data:image/png;base64,HIDDEN",
+          productUrl: "data:image/png;base64,HIDDEN"
+        })).slice(0, 8) 
       };
-      localStorage.setItem('lookcerto_state', JSON.stringify(stateToSave));
+      localStorage.setItem('lookcerto_state_v2', JSON.stringify(stateToSave));
     } catch (e) {
-      console.warn("LocalStorage cheio. Limpando histórico antigo.");
-      localStorage.removeItem('lookcerto_state');
+      console.warn("Storage Full");
     }
   }, [state]);
 
@@ -77,7 +79,7 @@ const App: React.FC = () => {
 
   const logout = () => {
     setState(prev => ({ ...prev, user: null, history: [], isAuthenticated: false }));
-    localStorage.removeItem('lookcerto_state');
+    localStorage.removeItem('lookcerto_state_v2');
   };
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
@@ -85,10 +87,9 @@ const App: React.FC = () => {
   const addHistoryItem = (item: MockupResult) => {
     setState(prev => {
       if (!prev.user) return prev;
-      const newHistory = [item, ...prev.history].slice(0, 10);
       return {
         ...prev,
-        history: newHistory,
+        history: [item, ...prev.history].slice(0, 15),
         user: { ...prev.user, credits: Math.max(0, prev.user.credits - 1) }
       };
     });

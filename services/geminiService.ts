@@ -3,8 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 
 export class GeminiService {
   /**
-   * Motor de Renderização LookCerto v4.5
-   * Modelo: gemini-2.5-flash-image
+   * Motor de Renderização LookCerto v4.6
+   * Especializado em Síntese de Vestuário (Virtual Try-On)
    */
   async generateMockup(
     personBase64: string,
@@ -14,10 +14,21 @@ export class GeminiService {
   ): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const prompt = `Task: Virtual Try-On. 
-    Wrap the clothing item from Input 2 onto the person in Input 1. 
-    Maintain person's pose and background. Natural lighting. 
-    Category: ${category}. ${additionalPrompt}`;
+    // Prompt de Engenharia Reversa de Imagem para Síntese
+    const prompt = `INSTRUCTION: Virtual Try-On Synthesis.
+    - INPUT 1: Target Person (Model).
+    - INPUT 2: Garment/Clothing (${category}).
+    
+    TASK:
+    1. Extract the clothing from Input 2.
+    2. Place and wrap it perfectly onto the person's body in Input 1.
+    3. Respect human anatomy, limb positions, and perspective.
+    4. Match lighting, shadows, and skin-tone reflections from Input 1 onto the new garment.
+    5. KEEP the person's head, face, hands, and background 100% IDENTICAL to Input 1.
+    6. Ensure fabric folds and textures look realistic.
+    
+    OUTPUT: A single integrated high-resolution photo. NO TEXT. NO SPLIT SCREEN.
+    ${additionalPrompt}`;
 
     try {
       const response = await ai.models.generateContent({
@@ -31,30 +42,24 @@ export class GeminiService {
         },
       });
 
-      if (!response.candidates || response.candidates.length === 0) {
-        throw new Error("O motor de IA não gerou uma resposta válida. Verifique as fotos.");
+      if (!response.candidates?.[0]?.content?.parts) {
+        throw new Error("Resposta incompleta da IA. Tente fotos com melhor contraste.");
       }
 
-      const candidate = response.candidates[0];
-
-      // Busca segura pela parte de imagem sem disparar getters de texto
-      const imagePart = candidate.content?.parts?.find(p => p.inlineData);
-      
-      if (imagePart?.inlineData?.data) {
-        return `data:image/jpeg;base64,${imagePart.inlineData.data}`;
+      // Procura rigorosa por dados binários de imagem
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData?.data) {
+          return `data:image/jpeg;base64,${part.inlineData.data}`;
+        }
       }
 
-      // Tratamento de segurança
-      if (candidate.finishReason === 'SAFETY') {
-        throw new Error("A imagem foi filtrada por questões de segurança. Use fotos mais conservadoras.");
+      if (response.candidates[0].finishReason === 'SAFETY') {
+        throw new Error("A imagem foi bloqueada pelos filtros de segurança. Evite roupas íntimas ou poses sugestivas.");
       }
 
-      throw new Error("O modelo não retornou uma imagem integrada. Tente novamente.");
+      throw new Error("Falha ao sintetizar imagem. O modelo retornou apenas texto.");
     } catch (error: any) {
-      console.error("Gemini Critical Error:", error);
-      if (error.message?.includes("fetch")) {
-        throw new Error("Erro de conexão com o servidor de IA. Verifique sua internet.");
-      }
+      console.error("Gemini Synthesis Engine Failure:", error);
       throw error;
     }
   }
