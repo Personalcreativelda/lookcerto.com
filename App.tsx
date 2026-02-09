@@ -50,8 +50,25 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
+  // Efeito para persistência segura
   useEffect(() => {
-    localStorage.setItem('lookcerto_state', JSON.stringify(state));
+    try {
+      // Antes de salvar, removemos imagens em Base64 do histórico se forem muito grandes
+      // para evitar estourar o limite de 5MB do localStorage
+      const stateToSave = {
+        ...state,
+        history: state.history.map(item => ({
+          ...item,
+          // Se a imagem for base64 e não uma URL real, mantemos apenas se for a última
+          // ou removemos se o estado ficar muito grande. Aqui apenas salvamos.
+          imageUrl: item.imageUrl.length > 1000000 ? item.imageUrl.substring(0, 100) + "...truncated" : item.imageUrl
+        })).slice(0, 5) // Guardamos apenas os 5 últimos para segurança
+      };
+      localStorage.setItem('lookcerto_state', JSON.stringify(stateToSave));
+    } catch (e) {
+      console.warn("LocalStorage cheio. Limpando histórico antigo.");
+      localStorage.removeItem('lookcerto_state');
+    }
   }, [state]);
 
   const login = (user: User) => {
@@ -59,41 +76,43 @@ const App: React.FC = () => {
   };
 
   const logout = () => {
-    setState(prev => ({ ...prev, user: null, isAuthenticated: false }));
+    setState(prev => ({ ...prev, user: null, history: [], isAuthenticated: false }));
+    localStorage.removeItem('lookcerto_state');
   };
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const addHistoryItem = (item: MockupResult) => {
-    if (!state.user) return;
     setState(prev => {
-      const newHistory = [item, ...prev.history].slice(0, 15);
+      if (!prev.user) return prev;
+      const newHistory = [item, ...prev.history].slice(0, 10);
       return {
         ...prev,
         history: newHistory,
-        user: prev.user ? { ...prev.user, credits: Math.max(0, prev.user.credits - 1) } : null
+        user: { ...prev.user, credits: Math.max(0, prev.user.credits - 1) }
       };
     });
   };
 
   const updatePlan = (plan: PlanType) => {
-    if (!state.user) return;
-    let credits = 5;
-    if (plan === PlanType.PRO) credits = 50;
-    if (plan === PlanType.ENTERPRISE) credits = 9999;
-    
-    setState(prev => ({
-      ...prev,
-      user: prev.user ? { ...prev.user, plan, credits } : null
-    }));
+    setState(prev => {
+      if (!prev.user) return prev;
+      let credits = 5;
+      if (plan === PlanType.PRO) credits = 50;
+      if (plan === PlanType.ENTERPRISE) credits = 9999;
+      return {
+        ...prev,
+        user: { ...prev.user, plan, credits }
+      };
+    });
   };
 
   return (
     <HashRouter>
       <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-        {state.isAuthenticated && (
+        {state.isAuthenticated && state.user && (
           <Navbar 
-            user={state.user!} 
+            user={state.user} 
             onLogout={logout} 
             isDarkMode={isDarkMode} 
             toggleDarkMode={toggleDarkMode} 
@@ -113,7 +132,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
         <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 text-center text-slate-500 dark:text-slate-400 text-sm transition-colors">
-          <p>© 2024 lookcerto.com - Experimentador de Roupas Virtuais em Moçambique e o Mundo.</p>
+          <p>© 2024 lookcerto.com - Tecnologia de Provador Virtual Avançada.</p>
         </footer>
       </div>
     </HashRouter>
