@@ -27,10 +27,14 @@ const App: React.FC = () => {
 
   const [state, setState] = useState<AppState>(() => {
     try {
-      const saved = localStorage.getItem('lookcerto_state_v2');
-      if (saved) return JSON.parse(saved);
+      const saved = localStorage.getItem('lookcerto_v5_state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Garantimos que o histórico carregado não quebre a UI
+        return { ...parsed, history: parsed.history || [] };
+      }
     } catch (e) {
-      console.error("Falha ao carregar estado:", e);
+      console.error("Erro ao carregar cache:", e);
     }
     return {
       user: null,
@@ -50,26 +54,24 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  // Persistência segura: Apenas truncamos o que vai para o DISCO, não o que está em MEMÓRIA
+  // Persistência inteligente: Salva apenas metadados no localStorage para evitar crash
   useEffect(() => {
+    if (!state.isAuthenticated) return;
     try {
-      if (!state.isAuthenticated) return;
-
-      const stateToSave = {
+      const stateToDisk = {
         ...state,
         history: state.history.map(item => ({
           ...item,
-          // Se for base64 e for muito grande, salvamos apenas uma versão reduzida no disco
-          imageUrl: (item.imageUrl.startsWith('data:') && item.imageUrl.length > 500000)
-            ? "data:image/png;base64,TRUNCATED_FOR_STORAGE" 
-            : item.imageUrl,
-          personUrl: "data:image/png;base64,HIDDEN",
-          productUrl: "data:image/png;base64,HIDDEN"
-        })).slice(0, 8) 
+          // Se a imagem for muito pesada, não salvamos no localStorage (disco)
+          // mas ela permanece viva na MEMÓRIA do app (state) até o F5
+          imageUrl: item.imageUrl.length > 300000 ? "PREVIEW_IN_MEMORY" : item.imageUrl,
+          personUrl: "REF_IN_MEMORY",
+          productUrl: "REF_IN_MEMORY"
+        })).slice(0, 10)
       };
-      localStorage.setItem('lookcerto_state_v2', JSON.stringify(stateToSave));
+      localStorage.setItem('lookcerto_v5_state', JSON.stringify(stateToDisk));
     } catch (e) {
-      console.warn("Storage Full");
+      console.warn("LocalStorage atingiu o limite.");
     }
   }, [state]);
 
@@ -79,7 +81,7 @@ const App: React.FC = () => {
 
   const logout = () => {
     setState(prev => ({ ...prev, user: null, history: [], isAuthenticated: false }));
-    localStorage.removeItem('lookcerto_state_v2');
+    localStorage.removeItem('lookcerto_v5_state');
   };
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
@@ -89,7 +91,7 @@ const App: React.FC = () => {
       if (!prev.user) return prev;
       return {
         ...prev,
-        history: [item, ...prev.history].slice(0, 15),
+        history: [item, ...prev.history].slice(0, 20),
         user: { ...prev.user, credits: Math.max(0, prev.user.credits - 1) }
       };
     });
@@ -133,7 +135,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
         <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 text-center text-slate-500 dark:text-slate-400 text-sm transition-colors">
-          <p>© 2024 lookcerto.com - Tecnologia de Provador Virtual Avançada.</p>
+          <p>© 2024 lookcerto.com - Liderando a Inteligência Artificial em Moda.</p>
         </footer>
       </div>
     </HashRouter>

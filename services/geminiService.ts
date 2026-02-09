@@ -3,8 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 
 export class GeminiService {
   /**
-   * Motor de Renderização LookCerto v4.6
-   * Especializado em Síntese de Vestuário (Virtual Try-On)
+   * Motor de Renderização LookCerto v4.7 
+   * Tecnologia: Neural Cloth Draping & Texture Synthesis
    */
   async generateMockup(
     personBase64: string,
@@ -14,21 +14,19 @@ export class GeminiService {
   ): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Prompt de Engenharia Reversa de Imagem para Síntese
-    const prompt = `INSTRUCTION: Virtual Try-On Synthesis.
-    - INPUT 1: Target Person (Model).
-    - INPUT 2: Garment/Clothing (${category}).
+    // Prompt otimizado para fusão total de pixels (Image-to-Image Seamless Swap)
+    const prompt = `FASHION AI TASK: HIGH-FIDELITY VIRTUAL TRY-ON.
+    - IMAGE 1 (SOURCE): The human model and background.
+    - IMAGE 2 (TARGET): The exact outfit/clothing to be worn.
     
-    TASK:
-    1. Extract the clothing from Input 2.
-    2. Place and wrap it perfectly onto the person's body in Input 1.
-    3. Respect human anatomy, limb positions, and perspective.
-    4. Match lighting, shadows, and skin-tone reflections from Input 1 onto the new garment.
-    5. KEEP the person's head, face, hands, and background 100% IDENTICAL to Input 1.
-    6. Ensure fabric folds and textures look realistic.
+    STRICT INSTRUCTIONS:
+    1. SEAMLESS REPLACEMENT: Completely replace the person's current clothes in Image 1 with the FULL OUTFIT shown in Image 2.
+    2. NEURAL DRAPING: The new clothes must wrap realistically around the body's anatomy, respecting pose, muscle contours, and fabric folds.
+    3. PIXEL INTEGRITY: Maintain 100% of the person's face, skin tone, hair, hands, and the original background from Image 1.
+    4. PHOTOREALISM: Match the lighting, shadows, and environment reflections from Image 1 onto the new fabric from Image 2.
+    5. CATEGORY CONTEXT: This is a ${category} item. Ensure perfect fit and professional retouching finish.
     
-    OUTPUT: A single integrated high-resolution photo. NO TEXT. NO SPLIT SCREEN.
-    ${additionalPrompt}`;
+    OUTPUT: Return ONLY the final synthesized image. No text, no frames, no side-by-side.`;
 
     try {
       const response = await ai.models.generateContent({
@@ -43,10 +41,10 @@ export class GeminiService {
       });
 
       if (!response.candidates?.[0]?.content?.parts) {
-        throw new Error("Resposta incompleta da IA. Tente fotos com melhor contraste.");
+        throw new Error("O motor de IA não conseguiu processar a síntese. Tente fotos com iluminação direta.");
       }
 
-      // Procura rigorosa por dados binários de imagem
+      // Extração robusta do binário gerado
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData?.data) {
           return `data:image/jpeg;base64,${part.inlineData.data}`;
@@ -54,12 +52,12 @@ export class GeminiService {
       }
 
       if (response.candidates[0].finishReason === 'SAFETY') {
-        throw new Error("A imagem foi bloqueada pelos filtros de segurança. Evite roupas íntimas ou poses sugestivas.");
+        throw new Error("A imagem foi filtrada por segurança. Certifique-se de que as fotos são apropriadas.");
       }
 
-      throw new Error("Falha ao sintetizar imagem. O modelo retornou apenas texto.");
+      throw new Error("Erro na síntese: A IA não retornou a imagem processada.");
     } catch (error: any) {
-      console.error("Gemini Synthesis Engine Failure:", error);
+      console.error("Critical Engine Error:", error);
       throw error;
     }
   }
